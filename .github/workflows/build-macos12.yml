@@ -1,0 +1,46 @@
+name: Build macOS 12 Packages
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build PKG (${{ matrix.arch }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            arch: x86_64
+          - target: aarch64-apple-darwin
+            arch: arm64
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.96.0
+          targets: ${{ matrix.target }}
+
+      - name: Fetch bundled dictionaries and models
+        run: |
+          chmod +x ./tools/release/data-fetch.sh
+          ./tools/release/data-fetch.sh
+
+      - name: Build and bundle PKG
+        run: |
+          chmod +x ./apps/macos/scripts/bundle.sh
+          QINGJIAN_TARGET=${{ matrix.target }} ./apps/macos/scripts/bundle.sh --pkg
+
+      - name: Upload PKG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qingjian-macos-${{ matrix.arch }}-pkg
+          path: target/pkg/*.pkg
+          if-no-files-found: error

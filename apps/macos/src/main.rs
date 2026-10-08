@@ -54,6 +54,8 @@ fn main() {
     tracing::info!(class = %controller_class.name().to_string_lossy(), "控制器类已注册");
 
     let mtm = MainThreadMarker::new().expect("输入法入口必须在主线程");
+    // 提前初始化 NSApplication 以建立 WindowServer (SkyLight) 连接，兼容 macOS 12 等低版本系统状态栏初始化
+    let app = NSApplication::sharedApplication(mtm);
     if let Err(error) = host::init(mtm, &info) {
         tracing::error!(%error, "Engine 初始化失败");
         std::process::exit(1);
@@ -73,5 +75,5 @@ fn main() {
         );
         std::process::exit(1);
     };
-    NSApplication::sharedApplication(mtm).run();
+    app.run();
 }

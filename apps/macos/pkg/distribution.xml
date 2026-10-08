@@ -7,7 +7,7 @@
     <domains enable_localSystem="true"/>
     <options customize="never" require-scripts="true" rootVolumeOnly="true" hostArchitectures="@ARCH@"/>
     <allowed-os-versions>
-        <os-version min="13.0"/>
+        <os-version min="12.0"/>
     </allowed-os-versions>
     <welcome file="welcome.html" mime-type="text/html"/>
     <license file="license.txt" mime-type="text/plain"/>
