@@ -153,7 +153,7 @@ apps/*                     （组装：Engine::new(dict).with_translator(..).wit
 
 `apps/cli` 是 Phase 1 的测试壳：`cargo run -p qingjian-cli -- kaifa` 直接查询，
 不带参数进入交互模式（拼音查询、序号上屏、`:q` 退出），`--user-dict` 指定用户词频文件，
-`--language en|ja|es` 或环境变量 `QINGJIAN_LEARNING_LANGUAGE` 选学习语言。
+`--language en|ja|es|vi` 或环境变量 `QINGJIAN_LEARNING_LANGUAGE` 选学习语言。
 `--typing` 是性能测试模式：把输入当一键一键敲进去，每个前缀查一次并标注译文，一行一键打印各阶段耗时
 （这是输入法每键的真实工作量，联想在后台线程不算），启动日志里带各数据文件的加载耗时。
 性能改动要用 release 构建跑它看数字，目标每键 10 ms 以内。
@@ -242,7 +242,7 @@ bigram 语言模型 + Viterbi，加上简拼、模糊音、双拼。没有整句
 翻译走本地查表，运行时不调网络。这样天然满足「翻译不阻塞候选」的约束。
 随包的释义表由 `tools/gloss-gen` 用 LLM 离线批量生成（2026-09-04 定的路线，不用有道等网页接口：逆向接口不稳，
 攒下来的结果再分发有版权问题；LLM 输出许可干净）：从我们自己统计的一元词频表挑常用词（次数 ≥ 200、不超过 4 个字，约 6.4 万词），
-每个词一次请求同时要「词性 + 英文译词 + 日文译词与假名读音」，结果 JSONL 可续跑，`export` 转成 `glossary-en.tsv` / `glossary-ja.tsv`。
+每个词一次请求同时要「词性 + 英文译词 + 日文译词与假名读音 + 越南文译词」，结果 JSONL 可续跑，`export` 转成 `glossary-en.tsv` / `glossary-ja.tsv` / `glossary-vi.tsv`。
 释义格式 `词\t词性. 译词\t词性. 译词`，日文译词后 `|假名`；`Sense.reading` 存整词假名，`Sense::furigana()`（Core `candidate::furigana`）用译词里的假名段当锚点把读音对到各段汉字上，
 候选窗口按 `開発(かいはつ)する` 显示，假名淡色；纯假名 / 片假名词不注，对不上就整体注在后面。不用罗马音。
 CC-CEDICT 表（`dict-convert cedict`）保留为备用来源，覆盖面广但没有词性、释义偏长。
@@ -452,9 +452,11 @@ CC-CEDICT 表（`dict-convert cedict`）保留为备用来源，覆盖面广但�
   放行要等宿主把键交回应用，实测在部分宿主（Edge / QQ 等）里这个键到不了，用户看到的是「按了没反应」；
   其余（`@` 数字等）继续放行，宿主连不上 Server 时也只吃「可能是在打拼音」的字母（`service/key_sink.rs`），
   免得断连窗口里标点 / 数字跟着一起没反应；
-  `[apps] english_candidates_off` 按应用关闭：应用标识在 Windows 上是宿主进程的 exe 文件名（DLL 加载在应用进程里，`GetModuleFileNameW(NULL)`
+  `[apps] english_candidates_on` 白名单按应用给（`english_candidates_off` 从中排除）：应用标识在 Windows 上是宿主进程的 exe 文件名（DLL 加载在应用进程里，`GetModuleFileNameW(NULL)`
   取到就随 `OpenSession { app }` 报一次，Server 每会话记下，收键时按当前会话查），缺省名单分平台（`AppsConfig` 的三份常量与配置模板的 `[apps]` 一节按目标平台三选一：Windows 是 exe 文件名、macOS 是 bundle identifier、Linux 是 Fcitx5 认到的应用名，X11 下是 WM_CLASS、Wayland 下是 app_id），
   经典控制台的窗口属于 `conhost.exe`、Windows Terminal 是 `WindowsTerminal.exe`；
+  Server 把按会话应用算好的「给不给英文候选」随 `InputSettings` 下发，不给时英文模式与 Caps 下没在组句的字母 DLL 在 `OnTestKeyDown` 就不吃、原样交给应用
+  （吃了再由输入法插入的话，Photoshop 画布这类没有文本框的地方收不到 W / H / V 单键快捷键）；
   `[shortcut]` 的修饰键 + 数字（译词上屏 / 删候选，`dispatch/key/shortcut.rs`）：配置里的 `Modifiers` 按 option→Alt、control→Ctrl、command→Win
   落到 `KeyModifiers`，Router 按键码认数字、去掉 Caps 位后与配置比；DLL 见 Ctrl / Alt / Win 仍一律放行，只有组句中的修饰键 + 数字送 Server 判，
   没配到的 Router 回 Passthrough。删候选的那句反馈（「已删除…」/「没什么可删」）随下一帧的 `Frame::notice` 下发，自绘候选窗画在拼音行下方、
